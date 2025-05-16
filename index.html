@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      background-color: #f4f4f9;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #333;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #555;
+      padding-bottom: 10px;
+    }
+
+    .sidebar .buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .sidebar button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .sidebar button:hover {
+      background: #0056b3;
+    }
+
+    .history-item {
+      padding: 10px;
+      margin: 5px 0;
+      background: #444;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .history-item:hover {
+      background: #555;
+    }
+
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-left: 1px solid #ddd;
+    }
+
+    .chat-header {
+      background: #007bff;
+      color: white;
+      padding: 15px;
+      text-align: center;
+      font-size: 20px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      background: #f9f9f9;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .message {
+      max-width: 70%;
+      margin: 10px;
+      padding: 10px 15px;
+      border-radius: 15px;
+      position: relative;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      clear: both;
+    }
+
+    .message.user {
+      background: #007bff;
+      color: white;
+      align-self: flex-end;
+      margin-left: auto;
+      border-bottom-right-radius: 0;
+    }
+
+    .message.bot {
+      background: #e5e5ea;
+      color: black;
+      align-self: flex-start;
+      margin-right: auto;
+      border-bottom-left-radius: 0;
+    }
+
+    .chat-input {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+
+    .chat-input textarea {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      outline: none;
+      resize: none;
+      font-size: 16px;
+    }
+
+    .chat-input button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .chat-input button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Chat History</h2>
+    <div class="buttons">
+      <button onclick="newChat()">New Chat</button>
+      <button onclick="deleteHistory()">Delete History</button>
+    </div>
+    <div id="chat-history"></div>
+  </div>
+  <div class="chat-container">
+    <div class="chat-header">AI Chatbot</div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input">
+      <textarea id="user-input" rows="2" placeholder="Type your message..."></textarea>
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chatMessages = document.getElementById('chat-messages');
+    const chatHistory = document.getElementById('chat-history');
+    const userInput = document.getElementById('user-input');
+    let historyData = [];
+    let currentChatIndex = -1;
+    let session_id = null;
+
+    function addMessage(content, sender) {
+      const message = document.createElement('div');
+      message.className = `message ${sender}`;
+      message.textContent = content;
+      chatMessages.appendChild(message);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const userMessage = userInput.value.trim();
+      if (!userMessage) return;
+
+      addMessage(userMessage, 'user');
+      saveToHistory(userMessage, 'user');
+      userInput.value = '';
+
+      try {
+        const res = await fetch("http://127.0.0.1:8000/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: userMessage,
+            session_id: session_id
+          })
+        });
+
+        const data = await res.json();
+        session_id = data.session_id;
+        const botResponse = data.reply;
+
+        addMessage(botResponse, 'bot');
+        saveToHistory(botResponse, 'bot');
+      } catch (err) {
+        addMessage("Error contacting the chatbot server.", 'bot');
+      }
+    }
+
+    function saveToHistory(content, sender) {
+      if (currentChatIndex === -1) {
+        currentChatIndex = historyData.length;
+        historyData.push([]);
+        addHistoryItem(currentChatIndex);
+      }
+      historyData[currentChatIndex].push({ content, sender });
+    }
+
+    function addHistoryItem(index) {
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      historyItem.textContent = `Chat ${index + 1}`;
+      historyItem.onclick = () => loadChatHistory(index);
+      chatHistory.appendChild(historyItem);
+    }
+
+    function loadChatHistory(index) {
+      currentChatIndex = index;
+      chatMessages.innerHTML = '';
+      historyData[index].forEach(item => {
+        addMessage(item.content, item.sender);
+      });
+    }
+
+    function newChat() {
+      currentChatIndex = historyData.length;
+      historyData.push([]);
+      addHistoryItem(currentChatIndex);
+      chatMessages.innerHTML = '';
+      session_id = null;
+    }
+
+    function deleteHistory() {
+      if (confirm("Are you sure you want to delete all chat history?")) {
+        historyData = [];
+        currentChatIndex = -1;
+        chatHistory.innerHTML = '';
+        chatMessages.innerHTML = '';
+        session_id = null;
+      }
+    }
+  </script>
+</body>
+</html>
